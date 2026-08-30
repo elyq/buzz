@@ -15,6 +15,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
+import { assetUrl } from "@/shared/lib/assetUrl";
 
 function sortedSounds(recommended: SoundName): SoundName[] {
   const others = SOUND_NAMES.filter((n) => n !== recommended)
@@ -32,7 +33,7 @@ function Waveform({
   name: SoundName;
   className?: string;
 }) {
-  const maskImage = `url(/sounds/${name}.svg)`;
+  const maskImage = `url(${assetUrl(`/sounds/${name}.svg`)})`;
   return (
     <span
       aria-hidden="true"

@@ -58,6 +58,9 @@
 
   <body>
     <div id="root"></div>
+    <!-- Deployment config, before the bundle so it can be read at startup.
+         Only meaningful for the browser build; harmless under Tauri. -->
+    <script src="/config.js"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

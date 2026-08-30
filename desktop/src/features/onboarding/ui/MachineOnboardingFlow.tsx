@@ -44,6 +44,7 @@ import {
 } from "./OnboardingSlideTransition";
 import { SetupStep } from "./SetupStep";
 import type { DefaultConfigDraft } from "./types";
+import { assetUrl } from "@/shared/lib/assetUrl";
 
 export type MachineOnboardingPage =
   | "identity"
@@ -117,6 +118,27 @@ export function MachineOnboardingFlow({
   >("forward");
   const [returningFromSecurity, setReturningFromSecurity] =
     React.useState(false);
+
+  /**
+   * Move on from identity setup.
+   *
+   * The harness step configures command-line agent harnesses on *this machine*,
+   * which a browser tab does not have — the agents a web session talks to are
+   * already running on the relay's side. Showing it there would ask the user to
+   * install a CLI they cannot install, so the browser build finishes onboarding
+   * where the desktop build offers harness setup.
+   */
+  const advancePastIdentity = React.useCallback(
+    (pubkey: string | null) => {
+      setTransitionDirection("forward");
+      if (import.meta.env.MODE === "web") {
+        complete(pubkey ?? undefined);
+        return;
+      }
+      setPage("setup");
+    },
+    [complete],
+  );
   // Owned here so switching between the yellow onboarding view and the dark
   // security subview keeps the created backup, password, and test progress.
   const backupSession = useEncryptedBackupSession();
@@ -161,8 +183,7 @@ export function MachineOnboardingFlow({
       setIdentityWasImported(true);
       setSelectedPubkey(identity.pubkey);
       setIdentityStorage(identity.storage);
-      setTransitionDirection("forward");
-      setPage("setup");
+      advancePastIdentity(identity.pubkey);
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : "Failed to load identity",
@@ -170,7 +191,7 @@ export function MachineOnboardingFlow({
     } finally {
       setIsPending(false);
     }
-  }, [continueWithRecoveredIdentity, queryClient]);
+  }, [advancePastIdentity, continueWithRecoveredIdentity, queryClient]);
 
   const replaceLostIdentity = React.useCallback(async () => {
     const confirmed = window.confirm(
@@ -206,10 +227,9 @@ export function MachineOnboardingFlow({
       queryClient.setQueryData(["identity"], identity);
       setIdentityWasImported(true);
       setSelectedPubkey(identity.pubkey);
-      setTransitionDirection("forward");
-      setPage("setup");
+      advancePastIdentity(identity.pubkey);
     },
-    [continueWithIdentity, queryClient],
+    [advancePastIdentity, continueWithIdentity, queryClient],
   );
 
   const backFromKeyImport = React.useCallback(() => {
@@ -314,7 +334,7 @@ export function MachineOnboardingFlow({
               <img
                 alt="Buzz"
                 className="w-full max-w-[600px]"
-                src="/landing/buzz-wordmark.png"
+                src={assetUrl("/landing/buzz-wordmark.png")}
               />
               <p className="mt-2 max-w-[560px] text-center text-2xl font-normal leading-none text-foreground">
                 Your people, your agents, your projects —<br />
@@ -510,8 +530,7 @@ export function MachineOnboardingFlow({
                 direction={backupDirection}
                 identityStorage={identityStorage}
                 onNext={() => {
-                  setTransitionDirection("forward");
-                  setPage("setup");
+                  advancePastIdentity(selectedPubkey);
                 }}
                 onOpenPasswordBackup={() => {
                   resetEncryptedBackupSession(backupSession);

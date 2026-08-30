@@ -15,6 +15,7 @@ import { startIdentityRecoveryPairing } from "@/shared/api/tauriPairing";
 import { writeTextToClipboard } from "@/shared/lib/clipboard";
 import { Button } from "@/shared/ui/button";
 import { StyledQrCode } from "@/shared/ui/styled-qr-code";
+import { assetUrl } from "@/shared/lib/assetUrl";
 
 type Step = "loading" | "qr" | "sas" | "receiving" | "done" | "error";
 
@@ -167,7 +168,7 @@ export function IdentityRecoveryPairing({
         {step === "qr" && qrUri ? (
           <StyledQrCode
             animate
-            centerImageSrc="/app-icon@2x.png"
+            centerImageSrc={assetUrl("/app-icon@2x.png")}
             data-testid="identity-recovery-qr"
             size={240}
             title="Desktop identity recovery QR code"

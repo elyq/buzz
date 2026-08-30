@@ -17,6 +17,7 @@ import { useSystemColorScheme } from "@/shared/theme/useSystemColorScheme";
 import { Button } from "@/shared/ui/button";
 import { StartupWindowDragRegion } from "@/shared/ui/StartupWindowDragRegion";
 import { writeTextToClipboard } from "@/shared/lib/clipboard";
+import { assetUrl } from "@/shared/lib/assetUrl";
 
 const COPY_SUCCESS_MESSAGE =
   "Signed response copied. Paste it into the Buzz admin console.";
@@ -654,8 +655,8 @@ export function NostrBindConsentDialog() {
               <img
                 alt="Buzz"
                 className="h-14 w-14 rounded-xl shadow-xs"
-                src="/app-icon@2x.png"
-                srcSet="/app-icon@2x.png 1x, /app-icon@3x.png 2x"
+                src={assetUrl("/app-icon@2x.png")}
+                srcSet={`${assetUrl("/app-icon@2x.png")} 1x, ${assetUrl("/app-icon@3x.png")} 2x`}
               />
 
               {signedResponse ? (

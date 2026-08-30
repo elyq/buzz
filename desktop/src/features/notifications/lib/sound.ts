@@ -5,6 +5,7 @@ import {
   KIND_JOB_RESULT,
 } from "@/shared/constants/kinds";
 import type { FeedItemCategory } from "@/shared/api/types";
+import { assetUrl } from "@/shared/lib/assetUrl";
 
 export const SOUND_NAMES = [
   "bong",
@@ -162,7 +163,7 @@ const cache = new Map<SoundName, HTMLAudioElement>();
 function getAudio(name: SoundName): HTMLAudioElement {
   let audio = cache.get(name);
   if (!audio) {
-    audio = new Audio(`/sounds/${name}.mp3`);
+    audio = new Audio(assetUrl(`/sounds/${name}.mp3`));
     cache.set(name, audio);
   }
   return audio;

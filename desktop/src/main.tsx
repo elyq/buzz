@@ -108,6 +108,23 @@ function renderApp() {
   );
 }
 
+/**
+ * Install the browser backend for the `web` build.
+ *
+ * The Tauri build already has a Rust backend attached by the time the webview
+ * loads; this is the equivalent step, and it must complete before the first
+ * render because the app reads its identity and relay scope through `invoke`.
+ * The import is dynamic so a Tauri build never pulls the bridge into its bundle.
+ */
+async function installWebBridgeIfConfigured() {
+  if (import.meta.env.MODE !== "web") {
+    return;
+  }
+
+  const { installWebBridge } = await import("@/web/install");
+  installWebBridge();
+}
+
 async function installE2eBridgeIfConfigured() {
   // The mock bridge is compiled only into dev and explicit E2E builds. A
   // pre-bootstrap global alone must never activate mock IPC in production.
@@ -129,6 +146,7 @@ async function bootstrap() {
   initializeConversationDensityPreference();
   initializeFontSizePreference();
   startLocalStorageSweep();
+  await installWebBridgeIfConfigured();
   await installE2eBridgeIfConfigured();
   await migrateLegacyCommunityStorageBeforeRender();
   renderApp();

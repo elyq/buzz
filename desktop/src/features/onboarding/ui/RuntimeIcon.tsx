@@ -6,6 +6,7 @@ import { cn } from "@/shared/lib/cn";
 import { BuzzMark } from "@/shared/ui/buzz-logo/BuzzMark";
 import claudeLogoUrl from "../assets/harness-logos/claude.png?inline";
 import { RUNTIME_MARKS } from "./HarnessMarks";
+import { assetUrl } from "@/shared/lib/assetUrl";
 
 // Bundled logos for compiled-in runtimes (inline base64, no network fetch).
 // Monochrome marks live in RUNTIME_MARKS instead — inline SVGs that follow
@@ -14,7 +15,9 @@ const RUNTIME_LOGOS: Record<string, string> = {
   claude: claudeLogoUrl,
 };
 
-// Public-path logos for bundled presets. Served from /harness-logos/ at runtime.
+// Public-path logos for bundled presets, kept as raw paths under
+// desktop/public — presetLogos.test.mjs resolves each one on disk, and
+// getRuntimeLogoUrl applies the build's base path at the point of use.
 // Keys match the preset `id` values emitted by the backend PRESET_HARNESSES.
 export const PRESET_LOGOS: Record<string, string> = {
   devin: "/harness-logos/devin.svg",
@@ -39,7 +42,14 @@ export function getRuntimeDisplayLabel(
 
 function getRuntimeLogoUrl(runtime: AcpRuntimeCatalogEntry): string | null {
   const id = runtime.id.trim().toLowerCase();
-  return RUNTIME_LOGOS[id] ?? PRESET_LOGOS[id] ?? null;
+  // RUNTIME_LOGOS values are inlined data URLs; PRESET_LOGOS values are public
+  // paths, so only the latter need resolving against the build's base path.
+  const inlined = RUNTIME_LOGOS[id];
+  if (inlined) {
+    return inlined;
+  }
+  const preset = PRESET_LOGOS[id];
+  return preset ? assetUrl(preset) : null;
 }
 
 export function RuntimeIcon({

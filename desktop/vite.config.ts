@@ -5,8 +5,15 @@ import { tanstackRouter } from "@tanstack/router-plugin/vite";
 
 const host = process.env.TAURI_DEV_HOST;
 
+// The browser build is served from a sub-path on the relay's own origin (see
+// `docs/web-client.md`), so its asset URLs must be prefixed. Same-origin is not
+// incidental: it is what satisfies the relay's CORS allowlist and makes the
+// NIP-98 `u` tag match the tenant host the relay expects.
+const webBase = process.env.BUZZ_WEB_BASE ?? "/desktop/";
+
 // https://vite.dev/config/
-export default defineConfig(async () => ({
+export default defineConfig(async ({ mode }) => ({
+  base: mode === "web" ? webBase : "/",
   plugins: [
     tanstackRouter({
       target: "react",

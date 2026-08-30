@@ -21,6 +21,7 @@ import { StyledQrCode } from "@/shared/ui/styled-qr-code";
 import { SettingsOptionGroup, SettingsOptionRow } from "./SettingsOptionGroup";
 import { SettingsSectionHeader } from "./SettingsSectionHeader";
 import { writeTextToClipboard } from "@/shared/lib/clipboard";
+import { assetUrl } from "@/shared/lib/assetUrl";
 
 type PairingStep =
   | "idle"
@@ -464,7 +465,7 @@ export function MobilePairingCard({
               ) : step === "qr" && qrUri ? (
                 <StyledQrCode
                   animate
-                  centerImageSrc="/app-icon@2x.png"
+                  centerImageSrc={assetUrl("/app-icon@2x.png")}
                   data-testid="mobile-pairing-qr"
                   size={240}
                   title="Mobile pairing QR code"

@@ -42,6 +42,7 @@ import {
   type OnboardingTransitionDirection,
   OnboardingSlideTransition,
 } from "./OnboardingSlideTransition";
+import { assetUrl } from "@/shared/lib/assetUrl";
 
 function isRelayMembershipDeniedError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
@@ -54,9 +55,9 @@ function isRelayMembershipDeniedError(error: unknown): boolean {
 }
 
 const STARTER_PERSONA_ANIMATIONS: Record<string, string> = {
-  Fizz: "/onboarding/starter-team/fizz.png",
-  Honey: "/onboarding/starter-team/honey.png",
-  Pollen: "/onboarding/starter-team/pollen.png",
+  Fizz: assetUrl("/onboarding/starter-team/fizz.png"),
+  Honey: assetUrl("/onboarding/starter-team/honey.png"),
+  Pollen: assetUrl("/onboarding/starter-team/pollen.png"),
 };
 
 /** Fade duration for the "entering" curtain over the mounting app. */
