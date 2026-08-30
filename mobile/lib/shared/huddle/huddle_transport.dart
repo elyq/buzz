@@ -11,8 +11,12 @@ import 'huddle_wire.dart';
 
 typedef HuddleWebSocketFactory = WebSocketChannel Function(Uri uri);
 
-WebSocketChannel _openHuddleWebSocket(Uri uri) =>
-    IOWebSocketChannel.connect(uri, pingInterval: const Duration(seconds: 30));
+// Same dart:io constraint as `RelaySocket.connect`: `IOWebSocketChannel` throws
+// on web, and JS cannot send ping frames, so the browser keeps the connection
+// alive on its own.
+WebSocketChannel _openHuddleWebSocket(Uri uri) => kIsWeb
+    ? WebSocketChannel.connect(uri)
+    : IOWebSocketChannel.connect(uri, pingInterval: const Duration(seconds: 30));
 
 enum HuddleTransportPhase {
   idle,

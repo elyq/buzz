@@ -19,7 +19,10 @@ bool _messageActionPresentationInFlight = false;
 bool? _iosNativeMessageActionSurfaceSupported;
 
 Future<bool> _supportsIosNativeMessageActionSurface() async {
-  if (!Platform.isIOS) return false;
+  // `Platform` is dart:io, which throws on web rather than reporting a host —
+  // and `defaultTargetPlatform` reports iOS for iOS browsers, where this
+  // native surface does not exist. Both are excluded here.
+  if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) return false;
   final cached = _iosNativeMessageActionSurfaceSupported;
   if (cached != null) return cached;
 

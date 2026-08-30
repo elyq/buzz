@@ -51,8 +51,8 @@ class MediaVideoViewerPage extends HookConsumerWidget {
         // ExoPlayer supports the request headers on every range request, so
         // keep Android on its streaming path. iOS uses the authenticated local
         // copy below because AVPlayer can drop those headers after the first
-        // request.
-        if (Platform.isAndroid) {
+        // request. Web has no dart:io, so streaming is its only path.
+        if (kIsWeb || defaultTargetPlatform == TargetPlatform.android) {
           VideoPlayerController? streamingController;
           try {
             streamingController = VideoPlayerController.networkUrl(
@@ -72,7 +72,10 @@ class MediaVideoViewerPage extends HookConsumerWidget {
               await streamingController.dispose();
             }
             // Fall through to the authenticated local-file path only when the
-            // streaming controller cannot initialize.
+            // streaming controller cannot initialize — never on web, where that
+            // path needs dart:io. Surface the failure to the outer handler
+            // instead, which renders it as a load error.
+            if (kIsWeb) rethrow;
           }
         }
 

@@ -35,6 +35,25 @@ void validateInviteRelayUri(
     return;
   }
 
+  // `InternetAddress` and `InternetAddressType` come from `dart:io`, which on
+  // web is a stub that throws `Unsupported operation: Platform._version` the
+  // moment it is touched. This function runs on every relay-URL check — session
+  // start and each reconnect — so that throw is fatal on web: the client sits on
+  // its loading state forever while every network request succeeds.
+  //
+  // Fail closed rather than classify without dart:io. Web refuses IP-literal
+  // relays outright, which is strictly narrower than the native rule (public
+  // literals pass), so the "no non-public destinations" property is preserved.
+  // Hostnames take the same path they take natively.
+  if (kIsWeb) {
+    if (_looksLikeNumericAddress(host)) {
+      throw const FormatException(
+        'Relay URL must use a hostname, not an IP address',
+      );
+    }
+    return;
+  }
+
   final address = InternetAddress.tryParse(host);
   if (_looksLikeNumericAddress(host)) {
     // Only canonical dotted-decimal IPv4 is accepted. Ambiguous legacy forms

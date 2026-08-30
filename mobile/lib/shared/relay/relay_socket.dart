@@ -70,10 +70,19 @@ class RelaySocket {
     _state = SocketState.connecting;
 
     try {
-      _channel = IOWebSocketChannel.connect(
-        Uri.parse(_wsUrl),
-        pingInterval: debugPingInterval,
-      );
+      // `IOWebSocketChannel` comes from `web_socket_channel/io.dart`, i.e.
+      // dart:io — on web it throws UnsupportedError, and the `catch` below
+      // turns that into `_onDisconnected`, so the app retries forever with NO
+      // console error and no realtime session. Use the cross-platform factory
+      // there, which resolves to the browser's WebSocket. It takes no
+      // `pingInterval` because JS cannot send WebSocket ping frames at all;
+      // the browser handles keepalive itself.
+      _channel = kIsWeb
+          ? WebSocketChannel.connect(Uri.parse(_wsUrl))
+          : IOWebSocketChannel.connect(
+              Uri.parse(_wsUrl),
+              pingInterval: debugPingInterval,
+            );
       await _channel!.ready;
     } catch (e) {
       _state = SocketState.disconnected;
