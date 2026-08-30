@@ -8,7 +8,13 @@ const _maxBoxDepth = 32;
 const _maxMoovBytes = 64 * 1024 * 1024;
 const _copyBufferBytes = 1024 * 1024;
 const _uint32Max = 0xffffffff;
-const _uint64Max = 0x7fffffffffffffff;
+// dart2js models every int as a JS double, so the int64 maximum cannot appear
+// as a literal anywhere in the program — even here, where the only caller is
+// guarded by `defaultTargetPlatform == TargetPlatform.android` (see
+// media_upload.dart) and this code can never run on web. It still has to
+// COMPILE for web. Parsing at runtime keeps the native value exact; the web
+// value rounds to 2^63 and is unreachable.
+final int _uint64Max = int.parse('9223372036854775807');
 const _containerTypes = {
   'moov',
   'trak',
