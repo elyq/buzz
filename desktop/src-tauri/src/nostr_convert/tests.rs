@@ -760,3 +760,93 @@ fn timestamp_to_iso_known_value() {
     // Epoch
     assert_eq!(timestamp_to_iso(0), "1970-01-01T00:00:00Z");
 }
+
+/// A live relay serves kind:10100 entries whose content is only
+/// `{"channel_add_policy":"anyone"}` — no name, no policy — with the agent's
+/// identity and ownership proof on its kind:0 profile instead. Every field the
+/// mention composer needs is therefore absent from the directory entry, and
+/// each absence used to fail closed: the name became an npub, `respond_to`
+/// matched no branch in `relay_agent_is_shared_with_user`, and the nulled owner
+/// meant an owner-only agent excluded its own owner. Measured against a real
+/// relay that left 2 of 17 agents mentionable.
+#[test]
+fn thin_legacy_entry_takes_name_owner_and_policy_from_its_profile() {
+    let owner_keys = Keys::generate();
+    let agent_keys = Keys::generate();
+
+    let legacy = EventBuilder::new(Kind::Custom(10100), r#"{"channel_add_policy":"anyone"}"#)
+        .sign_with_keys(&agent_keys)
+        .expect("sign legacy directory entry");
+
+    let auth_tag_json =
+        buzz_sdk_pkg::nip_oa::compute_auth_tag(&owner_keys, &agent_keys.public_key(), "")
+            .expect("compute auth tag");
+    let auth_tag_values: Vec<String> =
+        serde_json::from_str(&auth_tag_json).expect("parse auth tag json");
+    let profile = EventBuilder::new(Kind::Metadata, r#"{"display_name":"cid"}"#)
+        .tags([Tag::parse(auth_tag_values).expect("parse auth tag")])
+        .sign_with_keys(&agent_keys)
+        .expect("sign profile");
+
+    let agents = relay_agents_from_directory_events(&[legacy], &[], &[profile]);
+
+    assert_eq!(agents.len(), 1);
+    assert_eq!(agents[0].name, "cid", "an npub name is unmentionable");
+    assert_eq!(
+        agents[0].owner_pubkey.as_deref(),
+        Some(owner_keys.public_key().to_hex().as_str()),
+        "owner-only is mentionable only when the owner is known"
+    );
+    assert_eq!(
+        agents[0].respond_to,
+        Some(crate::managed_agents::RespondTo::OwnerOnly),
+        "an unset policy must fall back to the harness default, not to denial"
+    );
+}
+
+#[test]
+fn legacy_entry_keeps_its_own_name_and_policy_over_the_profile() {
+    let agent_keys = Keys::generate();
+    let legacy = EventBuilder::new(
+        Kind::Custom(10100),
+        r#"{"name":"from-directory","respond_to":"anyone"}"#,
+    )
+    .sign_with_keys(&agent_keys)
+    .expect("sign legacy directory entry");
+    let profile = EventBuilder::new(Kind::Metadata, r#"{"display_name":"from-profile"}"#)
+        .sign_with_keys(&agent_keys)
+        .expect("sign profile");
+
+    let agents = relay_agents_from_directory_events(&[legacy], &[], &[profile]);
+
+    assert_eq!(agents[0].name, "from-directory");
+    assert_eq!(
+        agents[0].respond_to,
+        Some(crate::managed_agents::RespondTo::Anyone)
+    );
+}
+
+#[test]
+fn legacy_entry_gains_no_owner_from_an_unverifiable_attestation() {
+    let owner_keys = Keys::generate();
+    let agent_keys = Keys::generate();
+    let legacy = EventBuilder::new(Kind::Custom(10100), "{}")
+        .sign_with_keys(&agent_keys)
+        .expect("sign legacy directory entry");
+    // Right shape, wrong signature: ownership must not be conferred.
+    let profile = EventBuilder::new(Kind::Metadata, r#"{"display_name":"impostor"}"#)
+        .tags([Tag::parse([
+            "auth".to_string(),
+            owner_keys.public_key().to_hex(),
+            String::new(),
+            "0".repeat(128),
+        ])
+        .expect("parse auth tag")])
+        .sign_with_keys(&agent_keys)
+        .expect("sign profile");
+
+    let agents = relay_agents_from_directory_events(&[legacy], &[], &[profile]);
+
+    assert_eq!(agents.len(), 1);
+    assert!(agents[0].owner_pubkey.is_none());
+}
