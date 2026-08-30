@@ -81,13 +81,49 @@ function stringArray(value: unknown): string[] {
  * otherwise, and neither the owner nor the channel list is trusted from content
  * — those come only from verified sources upstream.
  */
-function agentFromProfileEvent(event: SignedEvent): RawRelayAgent {
+/**
+ * Display names an agent published about itself, from its kind:0 profile.
+ *
+ * A kind:10100 directory entry usually carries no name at all — on a live relay
+ * its content is as thin as `{"channel_add_policy":"anyone"}` — while the
+ * agent's kind:0 profile holds the name people actually use (`cid`, `intake`).
+ * Both are self-authored and already fetched together, so the profile is the
+ * better source, not a guess.
+ */
+export function profileDisplayNames(
+  profileEvents: SignedEvent[],
+): Map<string, string> {
+  const names = new Map<string, string>();
+  for (const [pubkey, profile] of latestByAuthor(profileEvents)) {
+    const content = parseObject(profile.content);
+    const name =
+      (typeof content.display_name === "string" && content.display_name) ||
+      (typeof content.name === "string" && content.name) ||
+      "";
+    if (name.trim()) {
+      names.set(pubkey, name.trim());
+    }
+  }
+  return names;
+}
+
+function agentFromProfileEvent(
+  event: SignedEvent,
+  profileNames: Map<string, string>,
+): RawRelayAgent {
   const content = parseObject(event.content);
   const pubkey = event.pubkey.toLowerCase();
+  // Falling back to the pubkey is what breaks mentions: the composer ranks this
+  // `name` ABOVE the profile's display name (`buildMentionCandidates`), so a
+  // synthesized pubkey-shaped name wins and there is nothing left to type. The
+  // upstream Rust falls back to an npub here, which fails the same way. Reach
+  // for the kind:0 profile first and keep the pubkey as a last resort only.
   const displayName =
-    typeof content.display_name === "string" && content.display_name.trim()
+    (typeof content.display_name === "string" && content.display_name.trim()
       ? content.display_name
-      : pubkey;
+      : "") ||
+    profileNames.get(pubkey) ||
+    pubkey;
   return {
     pubkey,
     // A legacy directory entry is not an authenticated managed coordinate, so
@@ -189,9 +225,11 @@ export function relayAgentsFromDirectoryEvents(
     verifiedOwners,
   );
 
+  const profileNames = profileDisplayNames(profileEvents);
+
   const agents = new Map<string, RawRelayAgent>();
   for (const event of latestByAuthor(directoryEvents).values()) {
-    const agent = agentFromProfileEvent(event);
+    const agent = agentFromProfileEvent(event, profileNames);
     agents.set(agent.pubkey, agent);
   }
   for (const agentPubkey of verifiedPolicies.keys()) {

@@ -117,8 +117,38 @@ rather than approximated. `commands/agents.ts` reproduces
    win back permissions the owner has since narrowed.
 
 This is the same chain the Flutter client walks in
-`mobile/lib/shared/mentions/agent_identity_provider.dart`, which is why mentions
-behave the same in all three clients.
+`mobile/lib/shared/mentions/agent_identity_provider.dart`.
+
+#### One deliberate divergence: where the name comes from
+
+The authorization chain above is ported as-is. The **naming** is not, because
+the upstream behaviour makes mentions unusable on a real relay.
+
+`agents_from_events` in Rust names an agent from its kind:10100 directory entry
+and falls back to an npub. On a live relay that entry's content is as thin as
+`{"channel_add_policy":"anyone"}`, so the fallback is what ships — while the
+name people actually type (`cid`, `intake`) sits in the agent's kind:0 profile.
+
+That is not a cosmetic placeholder. `buildMentionCandidates` resolves a
+candidate's label as:
+
+```ts
+member.displayName?.trim() || agentName || profile?.displayName?.trim() || …
+```
+
+`agentName` outranks the profile name, so the synthesized npub wins and there is
+nothing left to match: the composer lists agents as npubs and `@cid` finds
+nobody. The desktop build has the same defect for the same reason.
+
+So `convert/agentDirectory.ts` resolves the name as: the directory entry's own
+name → the agent's kind:0 `display_name`/`name` → the pubkey, last resort. The
+kind:0 profile is self-authored and already fetched in the same call, so this
+adds no trust and no round trip. `convert/agentDirectory.test.mjs` pins it,
+using the thin directory content verbatim.
+
+Flutter avoids the problem differently — it identifies agents by pubkey and
+labels them from the profile cache — which is why mentions worked there while
+both TypeScript clients showed npubs.
 
 ---
 
