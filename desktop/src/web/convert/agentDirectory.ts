@@ -20,6 +20,14 @@ import { firstTagValue, tagsNamed } from "@/web/convert/tags";
 import { verifiedOaOwnerPubkey } from "@/web/convert/nipOa";
 
 /** kind:10100 — an agent's self-authored runtime profile. */
+/**
+ * What an agent responds to when its directory entry does not say.
+ *
+ * Mirrors `RespondTo::default()` in `buzz-acp` — the policy the agent's own
+ * runtime applies, so the UI offers exactly the mentions the agent would honour.
+ */
+const DEFAULT_RESPOND_TO = "owner-only";
+
 export const KIND_AGENT_PROFILE = 10100;
 /** kind:30177 — an owner's managed-agent policy, addressable by agent pubkey. */
 export const KIND_MANAGED_AGENT = 30177;
@@ -110,6 +118,7 @@ export function profileDisplayNames(
 function agentFromProfileEvent(
   event: SignedEvent,
   profileNames: Map<string, string>,
+  verifiedOwners: Map<string, string>,
 ): RawRelayAgent {
   const content = parseObject(event.content);
   const pubkey = event.pubkey.toLowerCase();
@@ -126,9 +135,14 @@ function agentFromProfileEvent(
     pubkey;
   return {
     pubkey,
-    // A legacy directory entry is not an authenticated managed coordinate, so
-    // it must never drive the live kind:30177 watcher.
-    owner_pubkey: null,
+    // The NIP-OA attestation on the agent's own kind:0 profile, verified in
+    // `verifiedAgentOwners`. Upstream nulls this on a legacy entry so it cannot
+    // drive the live kind:30177 watcher — a Rust concern with no counterpart
+    // here, since managed agents are machine-bound and unsupported in the
+    // browser. Dropping it costs mentions outright: an owner-only agent is
+    // mentionable only when its owner is known, so a null owner makes the
+    // owner themself unable to mention their own agent.
+    owner_pubkey: verifiedOwners.get(pubkey) ?? null,
     name: typeof content.name === "string" ? content.name : displayName,
     agent_type:
       typeof content.agent_type === "string" ? content.agent_type : "agent",
@@ -137,8 +151,17 @@ function agentFromProfileEvent(
     channel_ids: [],
     capabilities: stringArray(content.capabilities),
     status: typeof content.status === "string" ? content.status : "offline",
+    // `RespondTo::default()` is `OwnerOnly` (buzz-acp `config.rs`), and a
+    // kind:10100 entry routinely omits the field — on a live relay its content
+    // is just `{"channel_add_policy":"anyone"}`. Leaving it undefined is not
+    // neutral: `relayAgentIsSharedWithUser` matches "owner-only", "allowlist"
+    // and "anyone" explicitly and denies everything else, so an unset policy
+    // silently made every such agent unmentionable by anyone including its
+    // owner. Default to the harness default rather than to denial.
     respond_to:
-      typeof content.respond_to === "string" ? content.respond_to : undefined,
+      typeof content.respond_to === "string"
+        ? content.respond_to
+        : DEFAULT_RESPOND_TO,
     respond_to_allowlist: stringArray(content.respond_to_allowlist),
   };
 }
@@ -202,8 +225,17 @@ function agentFromManagedPolicy(
     channel_ids: [],
     capabilities: [],
     status: "offline",
+    // `RespondTo::default()` is `OwnerOnly` (buzz-acp `config.rs`), and a
+    // kind:10100 entry routinely omits the field — on a live relay its content
+    // is just `{"channel_add_policy":"anyone"}`. Leaving it undefined is not
+    // neutral: `relayAgentIsSharedWithUser` matches "owner-only", "allowlist"
+    // and "anyone" explicitly and denies everything else, so an unset policy
+    // silently made every such agent unmentionable by anyone including its
+    // owner. Default to the harness default rather than to denial.
     respond_to:
-      typeof content.respond_to === "string" ? content.respond_to : undefined,
+      typeof content.respond_to === "string"
+        ? content.respond_to
+        : DEFAULT_RESPOND_TO,
     respond_to_allowlist: stringArray(content.respond_to_allowlist),
   };
 }
@@ -229,7 +261,7 @@ export function relayAgentsFromDirectoryEvents(
 
   const agents = new Map<string, RawRelayAgent>();
   for (const event of latestByAuthor(directoryEvents).values()) {
-    const agent = agentFromProfileEvent(event, profileNames);
+    const agent = agentFromProfileEvent(event, profileNames, verifiedOwners);
     agents.set(agent.pubkey, agent);
   }
   for (const agentPubkey of verifiedPolicies.keys()) {

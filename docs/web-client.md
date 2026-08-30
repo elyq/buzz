@@ -119,10 +119,17 @@ rather than approximated. `commands/agents.ts` reproduces
 This is the same chain the Flutter client walks in
 `mobile/lib/shared/mentions/agent_identity_provider.dart`.
 
-#### One deliberate divergence: where the name comes from
+#### Deliberate divergences: what makes an agent mentionable
 
-The authorization chain above is ported as-is. The **naming** is not, because
-the upstream behaviour makes mentions unusable on a real relay.
+The authorization chain above is ported as-is. Three details around it are not,
+because upstream's behaviour makes mentions resolve nobody on a real relay.
+Measured against the live relay, they took the mentionable set from **2 of 17**
+agents to **13 of 17** — the four still excluded are `allowlist` policies that
+genuinely do not list the viewer.
+
+The shared cause: a kind:10100 directory entry on a live relay holds
+`{"channel_add_policy":"anyone"}` and nothing else. Every field the composer
+needs is absent from it, and each absence fails closed.
 
 `agents_from_events` in Rust names an agent from its kind:10100 directory entry
 and falls back to an npub. On a live relay that entry's content is as thin as
@@ -149,6 +156,33 @@ using the thin directory content verbatim.
 Flutter avoids the problem differently — it identifies agents by pubkey and
 labels them from the profile cache — which is why mentions worked there while
 both TypeScript clients showed npubs.
+
+##### `respond_to` defaults to denial
+
+`relayAgentIsSharedWithUser` matches `"owner-only"`, `"allowlist"` and
+`"anyone"` explicitly and denies anything else. An entry that omits
+`respond_to` therefore matches no branch and the agent is offered to nobody —
+not even its owner.
+
+`RespondTo::default()` in `buzz-acp`'s `config.rs` is `OwnerOnly`: that is the
+policy the agent's own runtime applies to an unset field. The directory now
+defaults to the same value, so the UI offers exactly the mentions the agent
+would actually honour. An explicit `respond_to` is never overridden.
+
+##### A legacy entry has no owner, so `owner-only` can never match
+
+Upstream sets `owner_pubkey: null` on a kind:10100 entry, so that a legacy
+record cannot drive the live kind:30177 watcher. That is a Rust concern with no
+counterpart here — managed agents are machine-bound and unsupported in the
+browser — and the cost is total: an `owner-only` agent is mentionable only when
+its owner is known, so a null owner locks out the one person allowed to mention
+it.
+
+The owner is already known and already verified: `verifiedAgentOwners` checks
+the NIP-OA attestation on the agent's own kind:0 profile, the same signature
+check the managed path uses. The directory now carries that verified owner.
+Nothing unverified is trusted — a bad signature still yields `null`, and an
+owner cannot attest itself into being its own agent.
 
 ---
 
